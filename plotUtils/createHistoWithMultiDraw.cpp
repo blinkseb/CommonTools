@@ -16,6 +16,7 @@
 #include <TTree.h>
 #include <TFile.h>
 #include <TDirectory.h>
+#include <TH1.h>
 
 #include <tclap/CmdLine.h>
 
@@ -153,6 +154,9 @@ bool execute(const std::string& datasets_json, const std::vector<std::string>& p
 bool execute(const std::string& datasets_json, const std::vector<Plot>& plots) {
     // Setting the TVirtualTreePlayer
     TVirtualTreePlayer::SetPlayer("TMultiDrawTreePlayer");
+
+    // Enable SumW2 on all histograms
+    TH1::SetDefaultSumw2(true);
 
     // Getting the list of samples    
     Json::Value samplesroot;
