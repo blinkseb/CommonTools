@@ -85,6 +85,10 @@ target_link_libraries(multidraw ${PYTHON_LIBRARY})
 
 target_link_libraries(multidraw "uuid")
 
+find_library(CTEMPLATE_LIBS NAMES "libctemplate_nothreads.a"
+    "ctemplate_nothreads" PATHS ${EXTERNAL_LIB_DIR} NO_DEFAULT_PATH)
+target_link_libraries(multidraw ${CTEMPLATE_LIBS})
+
 target_link_libraries(count ${ROOT_LIBRARIES})
 
 # Ensure C++11 is available
