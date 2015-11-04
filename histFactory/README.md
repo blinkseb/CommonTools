@@ -43,3 +43,22 @@ make
 ### Use condor to fill histograms
 
 See condorExample.py for usage.
+
+### Use new plotter generated on-the-fly
+
+VERY PRILIMINARY
+
+```
+cd build
+cmake ..
+make
+
+# This step create the plotter from the python configuration file and should builds everything
+../createPlotter.sh <skeleton ROOT file> <python configuration file> <output directory>
+
+cd <output directory>/build
+
+./plotter.exe -d <JSON dataset>
+```
+
+The first step needs a `skeleton file` in order to properly create the code. It's because it needs to know the structure of the tree in order to correctly identify which part of the expression are branches. This can be *any* file from *any* dataset, it really does not matter: you just have to ensure that the tree structure is correct.
