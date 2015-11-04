@@ -41,16 +41,22 @@ find_package(PythonLibs REQUIRED)
 include_directories(${PYTHON_INCLUDE_PATH})
 
 include_directories(${PROJECT_SOURCE_DIR})
+include_directories(${PROJECT_BINARY_DIR})
 
 # Configure external
+set(EXTERNAL_DIR "${PROJECT_BINARY_DIR}/external")
+set(EXTERNAL_INCLUDE_DIR "${EXTERNAL_DIR}/include")
+set(EXTERNAL_LIB_DIR "${EXTERNAL_DIR}/lib")
+set(EXTERNAL_SRC_DIR "${EXTERNAL_DIR}/src")
 
-#include(BuildExternals)
+include_directories(${EXTERNAL_INCLUDE_DIR})
 
-# Multidraw sources
+set(PLOTTER_SOURCES
+    Plotter.cc
+    ${EXTERNAL_SRC_DIR}/jsoncpp.cpp
+    )
 
 if(IN_CMSSW)
-
-    # Generate dictionnaries
     include_directories($ENV{CMSSW_BASE}/src)
 
     add_custom_command(OUTPUT ${PROJECT_BINARY_DIR}/classes.h COMMAND
@@ -58,12 +64,28 @@ if(IN_CMSSW)
         ${PROJECT_BINARY_DIR}/classes.h
         COMMENT "Generating classes.h...")
 
+    set(CP3LLBB_BASE "$ENV{CMSSW_BASE}/src/cp3_llbb")
+    file(GLOB CP3LLBB_SUBDIRS RELATIVE ${CP3LLBB_BASE} ${CP3LLBB_BASE}/*)
+    foreach(CP3LLBB_SUBDIR ${CP3LLBB_SUBDIRS})
+        if (IS_DIRECTORY ${CP3LLBB_BASE}/${CP3LLBB_SUBDIR})
+            # Do we have a dictionnary here?
+            set(SRC ${CP3LLBB_BASE}/${CP3LLBB_SUBDIR}/src)
+            if (EXISTS ${SRC}/classes.h
+                AND EXISTS ${SRC}/classes_def.xml)
+
+                REFLEX_GENERATE_DICTIONARY(${CP3LLBB_SUBDIR}_dict
+                    ${SRC}/classes.h
+                    SELECTION ${SRC}/classes_def.xml
+                    )
+
+                list(APPEND PLOTTER_SOURCES ${CP3LLBB_SUBDIR}_dict.cpp)
+                
+            endif()
+        endif()
+    endforeach()
 endif()
 
-set(PLOTTER_SOURCES
-    Plotter.cc
-    classes.h
-    )
+list(APPEND PLOTTER_SOURCES classes.h)
 
 add_executable(plotter ${PLOTTER_SOURCES})
 set_target_properties(plotter PROPERTIES OUTPUT_NAME "plotter.exe")

@@ -27,7 +27,7 @@ class Plotter {
             tree(tree) {};
         virtual ~Plotter() {};
 
-        void plot();
+        void plot(const std::string&);
 
     private:
         // List of branches

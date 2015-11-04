@@ -7,6 +7,14 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake/modules"
 # Detect if we are inside a CMSSW env
 include(CMSSW)
 
+# Ensure C++11 is available
+include(CheckCXXCompilerFlag)
+CHECK_CXX_COMPILER_FLAG("-std=c++0x" COMPILER_SUPPORTS_CXX0X)
+if(COMPILER_SUPPORTS_CXX0X)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x -g")
+else()
+    message(STATUS "The compiler ${CMAKE_CXX_COMPILER} has no C++11 support. Please use a different C++ compiler.")
+endif()
 # Find ROOT
 find_package(ROOT REQUIRED)
 find_library(ROOT_TREEPLAYER_LIBRARY TreePlayer ${ROOT_LIBRARY_DIR})
@@ -33,6 +41,12 @@ include_directories(${PYTHON_INCLUDE_PATH})
 # Configure external
 
 include(BuildExternals)
+
+# plotter sources
+set(PLOTTER_SOURCES
+    src/createPlotter.cpp
+    ${EXTERNAL_SRC_DIR}/jsoncpp.cpp
+    )
 
 # Multidraw sources
 set(MULTIDRAW_SOURCES
@@ -62,14 +76,16 @@ if(IN_CMSSW)
                     SELECTION ${SRC}/classes_def.xml
                     )
 
+                list(APPEND PLOTTER_SOURCES ${CP3LLBB_SUBDIR}_dict.cpp)
                 list(APPEND MULTIDRAW_SOURCES ${CP3LLBB_SUBDIR}_dict.cpp)
                 
             endif()
         endif()
     endforeach()
-
-
 endif()
+
+add_executable(plotter ${PLOTTER_SOURCES})
+set_target_properties(plotter PROPERTIES OUTPUT_NAME "createPlotter.exe")
 
 add_executable(multidraw ${MULTIDRAW_SOURCES})
 set_target_properties(multidraw PROPERTIES OUTPUT_NAME "createHistoWithMultiDraw.exe")
@@ -79,23 +95,20 @@ add_executable(count src/countProcessedEvents.cpp
 set_target_properties(count PROPERTIES OUTPUT_NAME "createProcessedEvents.exe")
 
 # Link libraries
+target_link_libraries(plotter ${ROOT_LIBRARIES})
+target_link_libraries(plotter ${ROOT_TREEPLAYER_LIBRARY})
+target_link_libraries(plotter ${PYTHON_LIBRARY})
+
+target_link_libraries(plotter "uuid")
+
+find_library(CTEMPLATE_LIBS NAMES "libctemplate_nothreads.a"
+    "ctemplate_nothreads" PATHS ${EXTERNAL_LIB_DIR} NO_DEFAULT_PATH)
+target_link_libraries(plotter ${CTEMPLATE_LIBS})
+
 target_link_libraries(multidraw ${ROOT_LIBRARIES})
 target_link_libraries(multidraw ${ROOT_TREEPLAYER_LIBRARY})
 target_link_libraries(multidraw ${PYTHON_LIBRARY})
 
 target_link_libraries(multidraw "uuid")
 
-find_library(CTEMPLATE_LIBS NAMES "libctemplate_nothreads.a"
-    "ctemplate_nothreads" PATHS ${EXTERNAL_LIB_DIR} NO_DEFAULT_PATH)
-target_link_libraries(multidraw ${CTEMPLATE_LIBS})
-
 target_link_libraries(count ${ROOT_LIBRARIES})
-
-# Ensure C++11 is available
-include(CheckCXXCompilerFlag)
-CHECK_CXX_COMPILER_FLAG("-std=c++0x" COMPILER_SUPPORTS_CXX0X)
-if(COMPILER_SUPPORTS_CXX0X)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
-else()
-    message(STATUS "The compiler ${CMAKE_CXX_COMPILER} has no C++11 support. Please use a different C++ compiler.")
-endif()

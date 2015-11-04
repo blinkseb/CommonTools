@@ -18,30 +18,15 @@
 #include <TApplication.h>
 #include <TObject.h>  // For kWriteDelete
 
-// Ugly hack to access list of leaves in the formula
-#define protected public
-#include <TTreeFormula.h>
-#undef protected
-
 #include <uuid/uuid.h>
 
 #include <tclap/CmdLine.h>
-
-#include <ctemplate/template.h>
-
-struct Branch {
-    std::string name;
-    std::string type;
-};
 
 struct Plot {
     std::string name;
     std::string variable;
     std::string plot_cut;
     std::string binning;
-
-    std::shared_ptr<TTreeFormula> var;
-    std::shared_ptr<TTreeFormula> selector;
 };
 
 struct Run;
@@ -128,28 +113,10 @@ std::string get_uuid() {
 
     uuid_unparse(out, &uuid[0]);
 
-    uuid[8] = '_';
-    uuid[13] = '_';
-    uuid[18] = '_';
-    uuid[23] = '_';
-
     // Remove null terminator
     uuid.resize(36);
 
-    // Ensure name starts with a letter to be a valid C++ identifier
-    uuid = "p_" + uuid;
-
     return uuid;
-}
-
-inline TBranch* getTopBranch(TBranch* branch) {
-    if (! branch)
-        return nullptr;
-
-    if (branch == branch->GetMother())
-        return branch;
-
-    return getTopBranch(branch->GetMother());
 }
 
 bool execute(const std::vector<Dataset>& datasets, const std::string& config_file, std::string output_dir = "");
@@ -307,136 +274,44 @@ bool execute(std::vector<Dataset>& datasets, const std::string& config_file, std
         }
 
         std::unique_ptr<TChain> t(new TChain(dataset.tree_name.c_str()));
-        std::string text_files;
-        for (const auto& file: dataset.files) {
-            text_files += "t->Add(\"" + file + "\");\n";
+        for (const auto& file: dataset.files)
             t->Add(file.c_str());
-        }
 
         TMultiDrawTreePlayer* player = dynamic_cast<TMultiDrawTreePlayer*>(t->GetPlayer());
 
         // Looping over the different plots
         for (Run& run: dataset.runs) {
             for (auto& p: run.plots) {
-                //std::string plot_var = p.variable + ">>" + p.name + p.binning;
-                //player->queueDraw(plot_var.c_str(), p.plot_cut.c_str(), "goff");
-                // Create formulas
-                p.var.reset(new TTreeFormula("var", p.variable.c_str(), t.get()));
-                p.selector.reset(new TTreeFormula("selector", p.plot_cut.c_str(), t.get()));
+                std::string plot_var = p.variable + ">>" + p.name + p.binning;
+                player->queueDraw(plot_var.c_str(), p.plot_cut.c_str(), "goff");
             }
         }
 
-        std::vector<Branch> branches;
-        std::function<void(TTreeFormula*)> getBranches = [&branches, &getBranches](TTreeFormula* f) {
-            if (!f)
-                return;
+        std::cout << "Drawing plots..." << std::endl;
+        player->execute();
+        std::cout << "Done" << std::endl;
 
-            for (size_t i = 0; i < f->GetNcodes(); i++) {
-                TLeaf* leaf = f->GetLeaf(i);
-                if (! leaf)
-                    continue;
-
-                TBranch* p_branch = getTopBranch(leaf->GetBranch());
-
-                Branch branch;
-                branch.name = p_branch->GetName();
-                if (std::find_if(branches.begin(), branches.end(), [&branch](const Branch& b) {  return b.name == branch.name;  }) == branches.end()) {
-                    branch.type = p_branch->GetClassName();
-                    if (branch.type.empty())
-                        branch.type = leaf->GetTypeName();
-
-                    branches.push_back(branch);
-                }
-
-                for (size_t j = 0; j < f->fNdimensions[i]; j++) {
-                    if (f->fVarIndexes[i][j])
-                        getBranches(f->fVarIndexes[i][j]);
-                }
-            }
-
-            for (size_t i = 0; i < f->fAliases.GetEntriesFast(); i++) {
-                getBranches((TTreeFormula*) f->fAliases.UncheckedAt(i));
-            }
-        };
-
-        for (Run& run: dataset.runs) {
-            for (auto& p: run.plots) {
-                getBranches(p.var.get());
-                getBranches(p.selector.get());
-            }
-        }
-
-        // Sort alphabetically
-        std::sort(branches.begin(), branches.end(), [](const Branch& a, const Branch& b) {
-            return a.name < b.name;
-        });
-
-        std::string text_branches;
-        for (const auto& branch: branches)  {
-            text_branches += "const " + branch.type + "& " + branch.name + " = tree[\"" + branch.name + "\"].read<" + branch.type + ">();\n        ";
-        }
-
-        // Create plots code
-        std::string hists_declaration;
-        std::string text_plots;
-
-        for (Run& run: dataset.runs) {
-            for (auto& p: run.plots) {
-
-                std::string binning = p.binning;
-                binning.erase(std::remove_if(binning.begin(), binning.end(), [](char chr) { return chr == '(' || chr == ')'; }), binning.end());
-                hists_declaration += "TH1* " + p.name + " = new TH1F(\"" + p.name + "\", \"\", " + binning + ");\n";
-
-                ctemplate::TemplateDictionary plot("plot");
-                plot.SetValue("CUT", p.plot_cut);
-                plot.SetValue("VAR", p.variable);
-                plot.SetValue("HIST", p.name);
-                
-                ctemplate::ExpandTemplate("../templates/Plot.tpl", ctemplate::DO_NOT_STRIP, &plot, &text_plots);
-            }
-        }
-
-        ctemplate::TemplateDictionary header("header");
-        header.SetValue("BRANCHES", text_branches);
-
-        std::string output;
-        ctemplate::ExpandTemplate("../templates/Plotter.h.tpl", ctemplate::DO_NOT_STRIP, &header, &output);
-
-        std::ofstream out("out/Plotter.h");
-        out << output;
-        out.close();
-
-        output.clear();
-
-        std::string text_save_plots;
+        size_t i = 1;
         for (const Run& run: dataset.runs) {
 
-            std::string text_save_plot;
+            std::string output = output_dir + "/" + run.dataset.output_name + ".root";
+            std::cout << "Saving plots for run " << i << " in file: " << output << std::endl;
+            std::unique_ptr<TFile> outfile(TFile::Open(output.c_str(), "recreate"));
+
             for (auto& p: run.plots) {
-                ctemplate::TemplateDictionary save_plot("save_plot");
-                save_plot.SetValue("UNIQUE_NAME", p.name);
-                save_plot.SetValue("PLOT_NAME", unique_names[p.name]);
-                ctemplate::ExpandTemplate("../templates/SavePlot.tpl", ctemplate::DO_NOT_STRIP, &save_plot, &text_save_plot);
+                std::string original_name = unique_names[p.name];
+
+                TObject* obj = plots_directory->Get(p.name.c_str());
+                if (obj) {
+                    ((TNamed*) obj)->SetName(original_name.c_str());
+                    obj->Write(unique_names[p.name].c_str(), TObject::kOverwrite);
+                    ((TNamed*) obj)->SetName(p.name.c_str());
+                }
             }
 
-            std::string output_file = output_dir + "/" + run.dataset.output_name + ".root";
-
-            ctemplate::TemplateDictionary save_plots("save_plots");
-            save_plots.SetValue("OUTPUT_FILE", output_file);
-            save_plots.SetValue("ALL_PLOTS", text_save_plot);
-            ctemplate::ExpandTemplate("../templates/SavePlots.tpl", ctemplate::DO_NOT_STRIP, &save_plots, &text_save_plots);
+            i++;
         }
 
-        ctemplate::TemplateDictionary source("source");
-        source.SetValue("HISTS_DECLARATION", hists_declaration);
-        source.SetValue("PLOTS", text_plots);
-        source.SetValue("SAVE_PLOTS", text_save_plots);
-        source.SetValue("FILES", text_files);
-        ctemplate::ExpandTemplate("../templates/Plotter.cc.tpl", ctemplate::DO_NOT_STRIP, &source, &output);
-
-        out.open("out/Plotter.cc");
-        out << output;
-        out.close();
     }
 
     return true;
@@ -569,4 +444,3 @@ int main( int argc, char* argv[]) {
 
     return 0;
 }
-
