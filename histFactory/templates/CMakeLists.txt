@@ -20,7 +20,8 @@ endif()
 find_package(ROOT REQUIRED)
 include_directories(${ROOT_INCLUDE_DIR})
 
-find_library(ROOT_GENVECTOR_LIB GenVector PATHS ${ROOT_LIB_DIR})
+find_library(ROOT_GENVECTOR_LIB GenVector PATHS ${ROOT_LIBRARY_DIR}
+    NO_DEFAULT_PATH)
 
 # Find Python
 
