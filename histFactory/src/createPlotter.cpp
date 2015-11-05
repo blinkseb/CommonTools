@@ -3,6 +3,8 @@
 
 #include <Python.h>
 
+#include <histFactory/config.h>
+
 #include <iostream>
 #include <fstream>
 #include <memory>
@@ -98,6 +100,13 @@ inline TBranch* getTopBranch(TBranch* branch) {
         return branch;
 
     return getTopBranch(branch->GetMother());
+}
+
+inline std::string getTemplate(const std::string& name) {
+    std::string p = TEMPLATE_PATH;
+    p += "/" + name + ".tpl";
+
+    return p;
 }
 
 bool execute(const std::string& skeleton, const std::string& config_file, std::string output_dir = "");
@@ -255,7 +264,7 @@ bool execute(const std::string& skeleton, const std::string& config_file, std::s
         plot.SetValue("VAR", p.variable);
         plot.SetValue("HIST", p.name);
 
-        ctemplate::ExpandTemplate("../templates/Plot.tpl", ctemplate::DO_NOT_STRIP, &plot, &text_plots);
+        ctemplate::ExpandTemplate(getTemplate("Plot"), ctemplate::DO_NOT_STRIP, &plot, &text_plots);
     }
 
     // Sort alphabetically
@@ -272,7 +281,7 @@ bool execute(const std::string& skeleton, const std::string& config_file, std::s
     header.SetValue("BRANCHES", text_branches);
 
     std::string output;
-    ctemplate::ExpandTemplate("../templates/Plotter.h.tpl", ctemplate::DO_NOT_STRIP, &header, &output);
+    ctemplate::ExpandTemplate(getTemplate("Plotter.h"), ctemplate::DO_NOT_STRIP, &header, &output);
 
     std::ofstream out(output_dir + "/Plotter.h");
     out << output;
@@ -285,14 +294,14 @@ bool execute(const std::string& skeleton, const std::string& config_file, std::s
         ctemplate::TemplateDictionary save_plot("save_plot");
         save_plot.SetValue("UNIQUE_NAME", p.name);
         save_plot.SetValue("PLOT_NAME", unique_names[p.name]);
-        ctemplate::ExpandTemplate("../templates/SavePlot.tpl", ctemplate::DO_NOT_STRIP, &save_plot, &text_save_plots);
+        ctemplate::ExpandTemplate(getTemplate("SavePlot"), ctemplate::DO_NOT_STRIP, &save_plot, &text_save_plots);
     }
 
     ctemplate::TemplateDictionary source("source");
     source.SetValue("HISTS_DECLARATION", hists_declaration);
     source.SetValue("PLOTS", text_plots);
     source.SetValue("SAVE_PLOTS", text_save_plots);
-    ctemplate::ExpandTemplate("../templates/Plotter.cc.tpl", ctemplate::DO_NOT_STRIP, &source, &output);
+    ctemplate::ExpandTemplate(getTemplate("Plotter.cc"), ctemplate::DO_NOT_STRIP, &source, &output);
 
     out.open(output_dir + "/Plotter.cc");
     out << output;

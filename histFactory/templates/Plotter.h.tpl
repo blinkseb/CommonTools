@@ -21,17 +21,28 @@ size_t Length$(const T& t) {
     return t.size();
 }
 
+struct Dataset {
+    std::string name;
+    std::string db_name;
+    std::string output_name;
+    std::string tree_name;
+    std::string path;
+    std::vector<std::string> files;
+    std::string cut;
+};
+
 class Plotter {
     public:
-        Plotter(ROOT::TreeWrapper& tree):
-            tree(tree) {};
+        Plotter(const Dataset& dataset, ROOT::TreeWrapper& tree):
+            m_dataset(dataset), tree(tree) {};
         virtual ~Plotter() {};
 
         void plot(const std::string&);
 
     private:
-        // List of branches
+        Dataset m_dataset;
         ROOT::TreeWrapper& tree;
 
+        // List of branches
         {{BRANCHES}}
 };

@@ -14,16 +14,6 @@
 #include <json/json.h>
 #include <tclap/CmdLine.h>
 
-struct Dataset {
-    std::string name;
-    std::string db_name;
-    std::string output_name;
-    std::string tree_name;
-    std::string path;
-    std::vector<std::string> files;
-    std::string cut;
-};
-
 void Plotter::plot(const std::string& output_file) {
 
     {{HISTS_DECLARATION}}
@@ -128,7 +118,7 @@ int main(int argc, char** argv) {
 
             ROOT::TreeWrapper wrapped_tree(t.get());
 
-            Plotter p(wrapped_tree);
+            Plotter p(d, wrapped_tree);
             p.plot(output_file);
             std::cout << "Done. Output saved as '" << output_file << "'" << std::endl;
         }

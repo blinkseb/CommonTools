@@ -42,6 +42,13 @@ include_directories(${PYTHON_INCLUDE_PATH})
 
 include(BuildExternals)
 
+# Create header files
+configure_file(src/config.h.in histFactory/config.h NEWLINE_STYLE UNIX)
+include_directories(${PROJECT_BINARY_DIR})
+
+# Create bash helper script for the plotter
+configure_file(scripts/createPlotter.sh.in createPlotter.sh @ONLY NEWLINE_STYLE UNIX)
+
 # plotter sources
 set(PLOTTER_SOURCES
     src/createPlotter.cpp
